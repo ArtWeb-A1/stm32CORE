@@ -1,3 +1,6 @@
 [submodule "src/libraries/STM32FreeRTOS"]
 	path = src/libraries/STM32FreeRTOS
 	url = https://github.com/stm32duino/STM32FreeRTOS.git
+[submodule "src/libraries/STM32CubeH5"]
+	path = src/libraries/STM32CubeH5
+	url = https://github.com/STMicroelectronics/STM32CubeH5.git
