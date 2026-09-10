@@ -15,22 +15,12 @@ MEMORY
                  LENGTH = LD_MAX_DATA_SIZE
 
   FLASH    (rx) : ORIGIN = 0x08000000 + LD_FLASH_OFFSET,
-                  LENGTH = LD_MAX_SIZE - LD_FLASH_OFFSET - 0x2000
-
-  KERNEL_API (rx) : ORIGIN = 0x080FE000,
-                    LENGTH = 0x2000
+                  LENGTH = LD_MAX_SIZE - LD_FLASH_OFFSET
 }
 
 /* Sections */
 SECTIONS
 {
-  .kernel_api :
-  {
-    . = ALIGN(8);
-    KEEP(*(.kernel_api))
-    . = ALIGN(8);
-  } >KERNEL_API
-
   /* The startup code into "FLASH" Rom type memory */
   .isr_vector :
   {
