@@ -1,0 +1,28 @@
+{
+  "build": {
+    "core": "stm32",
+    "cpu": "cortex-m33",
+    "extra_flags": "-DSTM32H562xx",
+    "f_cpu": "250000000L",
+    "mcu": "stm32h562vgt6",
+    "product_line": "STM32H562xx" 
+  },
+  "debug": {
+    "openocd_target": "stm32h5x"
+  },
+  "frameworks": [
+    "stm32cube"
+  ],
+  "name": "WeAct STM32H562VGT6",
+  "url": "https://github.com/WeActStudio",
+  "upload": {
+    "maximum_ram_size": 655360,
+    "maximum_size": 2097152,
+    "protocol": "dfu",
+    "protocols": [
+      "dfu",
+      "stlink"
+    ]
+  },
+  "vendor": "WeAct"
+}
