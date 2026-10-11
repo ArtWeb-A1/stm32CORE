@@ -6,7 +6,7 @@
 	// ==================== [Structures] ==================== //
 
 
-struct MPURegionConfig  // Структура определения региона.
+struct MPURegionConfig     // Структура определения региона.
 {
 	uint32_t PID;    // Process ID          - Процесс или родственный процесс владеющий регионом.
 	uint32_t RN;     // Region Num          - Номер региона.
@@ -19,7 +19,7 @@ struct MPURegionConfig  // Структура определения регио�
 	uint8_t RAttr;   // Region Attribute    - Атрибут региона.
 };
 
-struct RegisterContext
+struct RegisterContext     // Структура сохранения контекста регистров процессора.
 {
 	uint32_t R4;
 	uint32_t R5;
@@ -32,10 +32,10 @@ struct RegisterContext
 	uint32_t EXC_RETURN;
 };
 
-struct ProcessControlBlock
+struct ProcessControlBlock // Структура определения процесса.
 {
-	uint32_t PID;    // Process Id       	    - Номер процесса.
-	uint32_t PPID;   // Parent Process Id	    - Номер родительского процесса.
+	uint16_t PID;    // Process Id       	    - Номер процесса.
+	uint16_t PPID;   // Parent Process Id	    - Номер родительского процесса.
 	uint8_t PSTATE;  // Process State     	    - Состояние процесса.
 	uint8_t PP;      // Process Priority  	    - Приоретет процесса.
 	uint64_t PCpuT;  // Process Cpu Time        - Рабочее время процесса на CPU. (Сохраняет время в микросекундах).
@@ -45,14 +45,14 @@ struct ProcessControlBlock
 	uint32_t PTZ;    // Process Trust Zone      - Состояние trust зоны Secure/Non-secure.
 //	RegisterContext PR; // Process Registers    - Сохранение состояния регистров процессора для данного процесса (нужно сохранять только у потоков так как процесс это маска для нескольких потоков).
 	uint32_t POF;    // Process Open Files      - Все открытые файл процессом.
-	uint32_t PS;     // Process Signal          - Передача сигнала в процесс.
+	int16_t PS;     // Process Signal          - Передача сигнала в процесс.
 }; 
 
-struct ThreadControlBlock
+struct ThreadControlBlock  // Структура определения потока процесса.
 {
-	uint32_t PID;    // Process Id       	    - Номер процесса.
-	uint32_t TID;    // Thread Id               - Номер потока процесса.
-	uint32_t PTID;   // Parent Thread Id  	    - Номер родительского потока процесса.
+	uint16_t PID;    // Process Id       	    - Номер процесса.
+	uint16_t TID;    // Thread Id               - Номер потока процесса.
+	uint16_t PTID;   // Parent Thread Id  	    - Номер родительского потока процесса.
 	uint8_t TSTATE;  // Thread State      	    - Состояние потока процесса.
 	uint8_t TP;      // Thread Priority  	    - Приоретет потока процесса.
 	uint64_t TCpuT;  // Thread Cpu Time         - Рабочее время потока процесса на CPU. (Сохраняет время в микросекундах).
@@ -61,7 +61,7 @@ struct ThreadControlBlock
 	uint32_t TPC;    // Thread Program Counter   - Значение следующий инструкции процесса.
 	RegisterContext TR;// Thread Registers       - Сохранение состояния регистров процессора для данного процесса
 //	uint32_t TOF;    // Thread Open Files        - Все открытые файл процессом. (все потоки будут иметь доступ к файлам процесса).
-	uint32_t TS;     // Thread Signal            - Передача сигнала в процесс.
+	int16_t TS;     // Thread Signal            - Передача сигнала в процесс.
 };
 
 // struct PCB_makeProcess							// Первоначальная версия таблици процесса.
@@ -86,23 +86,51 @@ struct ThreadControlBlock
 	// ==================== [Constants] ==================== //
 	
 
-#define MPURegionConfigSize      (sizeof(MPURegionConfig) * 8U)
-#define RegisterContextSize      (sizeof(RegisterContext) * 8U)
+#define MPURegionConfigSize      (sizeof(MPURegionConfig) * 8U)       // Размер структуры определения региона в битах.
+#define RegisterContextSize      (sizeof(RegisterContext) * 8U)       // Размер 
 #define ProcessControlBlockSize  (sizeof(ProcessControlBlock) * 8U)
 #define ThreadControlBlockSize   (sizeof(ThreadControlBlock) * 8U)
 
-MPURegionConfig MPU_regions[MPURegionConfigSize*12U] {};     // Массив с текущими регионами (включая выключенных).
+MPURegionConfig MPU_regions[MPURegionConfigSize*12U] {};        // Массив с текущими регионами (включая выключенных).
+ProcessControlBlock ProcessList[ProcessControlBlockSize*16U] {}; // Массив со всеми текущими процессами.
+ThreadControlBlock ThreadList[ThreadControlBlockSize*64U] {};    // Массив со всеми текущими потоками.
+
+uint16_t ProcessCount = 0;
 
 // ==================== [Call func prototypes] ==================== //
 
+// Базовое значение кванта для тестирования 1мс. В будующем будет меняться по мере развития структуры и тестирования.
+
+ThreadControlBlock *scheduler(void) 
+{
+	bool ThreadIsReady = false;
+	if (ProcessCount == 0)
+	{
+		// Вызывать PID 0 Idle.
+	} else
+	{
+		for (uint16_t i=0; i<ProcessCount; i++)         // Перебор всех процессов.
+		{
+			if (ProcessList[i].PSTATE == PROCESS_READY) // PROCESS_READY - макрос значение для ready процесса.
+			{
+				// ProcessIsReady = true;
+				// Процесс готов к выполнению. Нужно переходить к проверке потока.
+			}
+		}
+		if (ThreadIsReady == false)
+		{
+			// Вызывать PID 0 Idle.
+		}
+	}
+}
 
 // void Secure_MPU_Init(void);
 
 
 // ==================== [Main function] ==================== //
 
-
-int main(void) {
+int main(void) 
+{
     HAL_Init();
 
 
@@ -111,6 +139,9 @@ int main(void) {
 }
 
 // ==================== [Another functions] ==================== //
+
+
+
 // void Secure_MPU_Init(void)
 // {
     // // Отключаем MPU, чтобы безопасно изменить его настройки.
