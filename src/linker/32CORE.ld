@@ -1,157 +1,188 @@
-/* Entry Point */
+
+/* Entry point */
 ENTRY(Reset_Handler)
 
-/* Highest address of the user mode stack */
-_estack = ORIGIN(RAM) + LENGTH(RAM); /* end of "RAM" Ram type memory */
-_sstack = _estack - _Min_Stack_Size;
+/* Memory layout for STM32H562VGT6
+ *
+ * FLASH: 2 MiB
+ * SRAM1: 256 KiB  @ 0x20000000
+ * SRAM2:  64 KiB  @ 0x20040000
+ * SRAM3: 320 KiB  @ 0x20050000
+ *
+ * SRAM1 + SRAM2 + SRAM3 are contiguous:
+ * 0x20000000 .. 0x200A0000
+ *
+ * BKPSRAM is separate and is not included here.
+ */
 
-_Min_Heap_Size = 0x200; /* required amount of heap */
-_Min_Stack_Size = 0x400; /* required amount of stack */
+_Min_Heap_Size  = 0x200;
+_Min_Stack_Size = 0x400;
 
-/* Memories definition */
 MEMORY
 {
-  RAM    (xrw) : ORIGIN = 0x20000000,
-                 LENGTH = LD_MAX_DATA_SIZE
-
-  FLASH    (rx) : ORIGIN = 0x08000000 + LD_FLASH_OFFSET,
-                  LENGTH = LD_MAX_SIZE - LD_FLASH_OFFSET
+    RAM   (xrw) : ORIGIN = 0x20000000, LENGTH = 640K
+    FLASH (rx)  : ORIGIN = 0x08000000, LENGTH = 2048K
 }
+
+/* Stack starts at the end of RAM */
+_estack = ORIGIN(RAM) + LENGTH(RAM);
+_sstack = _estack - _Min_Stack_Size;
 
 /* Sections */
 SECTIONS
 {
-  /* The startup code into "FLASH" Rom type memory */
-  .isr_vector :
-  {
-    . = ALIGN(4);
-    KEEP(*(.isr_vector)) /* Startup code */
-    . = ALIGN(4);
-  } >FLASH
+    /* Interrupt vector table */
+    .isr_vector :
+    {
+        . = ALIGN(4);
+        KEEP(*(.isr_vector))
+        . = ALIGN(4);
+    } > FLASH
 
-  /* The program code and other data into "FLASH" Rom type memory */
-  .text :
-  {
-    . = ALIGN(4);
-    *(.text)           /* .text sections (code) */
-    *(.text*)          /* .text* sections (code) */
-    *(.glue_7)         /* glue arm to thumb code */
-    *(.glue_7t)        /* glue thumb to arm code */
-    *(.eh_frame)
+    /* Program code */
+    .text :
+    {
+        . = ALIGN(4);
 
-    KEEP (*(.init))
-    KEEP (*(.fini))
+        *(.text)
+        *(.text*)
+        *(.glue_7)
+        *(.glue_7t)
+        *(.eh_frame)
 
-    . = ALIGN(4);
-    _etext = .;        /* define a global symbols at end of code */
-  } >FLASH
+        KEEP(*(.init))
+        KEEP(*(.fini))
 
-  /* Constant data into "FLASH" Rom type memory */
-  .rodata :
-  {
-    . = ALIGN(4);
-    *(.rodata)         /* .rodata sections (constants, strings, etc.) */
-    *(.rodata*)        /* .rodata* sections (constants, strings, etc.) */
-    . = ALIGN(4);
-  } >FLASH
+        . = ALIGN(4);
+        _etext = .;
+    } > FLASH
 
-  .ARM.extab (READONLY) : /* The "READONLY" keyword is only supported in GCC11 and later, remove it if using GCC10 or earlier. */
-  {
-    . = ALIGN(4);
-    *(.ARM.extab* .gnu.linkonce.armextab.*)
-    . = ALIGN(4);
-  } >FLASH
+    /* Read-only data */
+    .rodata :
+    {
+        . = ALIGN(4);
+        *(.rodata)
+        *(.rodata*)
+        . = ALIGN(4);
+    } > FLASH
 
-  .ARM (READONLY) : /* The "READONLY" keyword is only supported in GCC11 and later, remove it if using GCC10 or earlier. */
-  {
-    . = ALIGN(4);
-    __exidx_start = .;
-    *(.ARM.exidx*)
-    __exidx_end = .;
-    . = ALIGN(4);
-  } >FLASH
+    /* ARM exception unwind tables */
+    .ARM.extab :
+    {
+        . = ALIGN(4);
+        *(.ARM.extab* .gnu.linkonce.armextab.*)
+        . = ALIGN(4);
+    } > FLASH
 
-  .preinit_array (READONLY) : /* The "READONLY" keyword is only supported in GCC11 and later, remove it if using GCC10 or earlier. */
-  {
-    . = ALIGN(4);
-    PROVIDE_HIDDEN (__preinit_array_start = .);
-    KEEP (*(.preinit_array*))
-    PROVIDE_HIDDEN (__preinit_array_end = .);
-    . = ALIGN(4);
-  } >FLASH
+    .ARM.exidx :
+    {
+        . = ALIGN(4);
+        __exidx_start = .;
+        *(.ARM.exidx*)
+        __exidx_end = .;
+        . = ALIGN(4);
+    } > FLASH
 
-  .init_array (READONLY) : /* The "READONLY" keyword is only supported in GCC11 and later, remove it if using GCC10 or earlier. */
-  {
-    . = ALIGN(4);
-    PROVIDE_HIDDEN (__init_array_start = .);
-    KEEP (*(SORT(.init_array.*)))
-    KEEP (*(.init_array*))
-    PROVIDE_HIDDEN (__init_array_end = .);
-    . = ALIGN(4);
-  } >FLASH
+    /* Pre-initialization array */
+    .preinit_array :
+    {
+        . = ALIGN(4);
+        PROVIDE_HIDDEN(__preinit_array_start = .);
+        KEEP(*(.preinit_array*))
+        PROVIDE_HIDDEN(__preinit_array_end = .);
+        . = ALIGN(4);
+    } > FLASH
 
-  .fini_array (READONLY) : /* The "READONLY" keyword is only supported in GCC11 and later, remove it if using GCC10 or earlier. */
-  {
-    . = ALIGN(4);
-    PROVIDE_HIDDEN (__fini_array_start = .);
-    KEEP (*(SORT(.fini_array.*)))
-    KEEP (*(.fini_array*))
-    PROVIDE_HIDDEN (__fini_array_end = .);
-    . = ALIGN(4);
-  } >FLASH
+    /* C++ constructors */
+    .init_array :
+    {
+        . = ALIGN(4);
+        PROVIDE_HIDDEN(__init_array_start = .);
+        KEEP(*(SORT(.init_array.*)))
+        KEEP(*(.init_array))
+        PROVIDE_HIDDEN(__init_array_end = .);
+        . = ALIGN(4);
+    } > FLASH
 
-  /* Used by the startup to initialize data */
-  _sidata = LOADADDR(.data);
+    /* C++ destructors */
+    .fini_array :
+    {
+        . = ALIGN(4);
+        PROVIDE_HIDDEN(__fini_array_start = .);
+        KEEP(*(SORT(.fini_array.*)))
+        KEEP(*(.fini_array))
+        PROVIDE_HIDDEN(__fini_array_end = .);
+        . = ALIGN(4);
+    } > FLASH
 
-  /* Initialized data sections into "RAM" Ram type memory */
-  .data :
-  {
-    . = ALIGN(4);
-    _sdata = .;        /* create a global symbol at data start */
-    *(.data)           /* .data sections */
-    *(.data*)          /* .data* sections */
-    *(.RamFunc)        /* .RamFunc sections */
-    *(.RamFunc*)       /* .RamFunc* sections */
+    /* Initialized data: load from FLASH, execute from RAM */
+    _sidata = LOADADDR(.data);
 
-    . = ALIGN(4);
-    _edata = .;        /* define a global symbol at data end */
+    .data :
+    {
+        . = ALIGN(4);
+        _sdata = .;
 
-  } >RAM AT> FLASH
+        *(.data)
+        *(.data*)
+        *(.RamFunc)
+        *(.RamFunc*)
 
-  /* Uninitialized data section into "RAM" Ram type memory */
-  . = ALIGN(4);
-  .bss :
-  {
-    /* This is used by the startup in order to initialize the .bss section */
-    _sbss = .;         /* define a global symbol at bss start */
-    __bss_start__ = _sbss;
-    *(.bss)
-    *(.bss*)
-    *(COMMON)
+        . = ALIGN(4);
+        _edata = .;
+    } > RAM AT > FLASH
 
-    . = ALIGN(4);
-    _ebss = .;         /* define a global symbol at bss end */
-    __bss_end__ = _ebss;
-  } >RAM
+    /* Zero-initialized data */
+    .bss :
+    {
+        . = ALIGN(4);
+        _sbss = .;
+        __bss_start__ = _sbss;
 
-  /* User_heap_stack section, used to check that there is enough "RAM" Ram  type memory left */
-  ._user_heap_stack :
-  {
-    . = ALIGN(8);
-    PROVIDE ( end = . );
-    PROVIDE ( _end = . );
-    . = . + _Min_Heap_Size;
-    . = . + _Min_Stack_Size;
-    . = ALIGN(8);
-  } >RAM
+        *(.bss)
+        *(.bss*)
+        *(COMMON)
 
-  /* Remove information from the compiler libraries */
-  /DISCARD/ :
-  {
-    libc.a ( * )
-    libm.a ( * )
-    libgcc.a ( * )
-  }
+        . = ALIGN(4);
+        _ebss = .;
+        __bss_end__ = _ebss;
+    } > RAM
 
-  .ARM.attributes 0 : { *(.ARM.attributes) }
+    /* Heap and minimum stack reservation */
+    ._user_heap_stack :
+    {
+        . = ALIGN(8);
+        PROVIDE(end = .);
+        PROVIDE(_end = .);
+
+        . = . + _Min_Heap_Size;
+        . = . + _Min_Stack_Size;
+
+        . = ALIGN(8);
+    } > RAM
+
+    /* Discard unused library metadata */
+    /DISCARD/ :
+    {
+        libc.a (*)
+        libm.a (*)
+        libgcc.a (*)
+    }
+
+    /* ELF attributes */
+    .ARM.attributes 0 :
+    {
+        *(.ARM.attributes)
+    }
 }
+
+/* Fail the link if the minimum heap/stack reservation does not fit. */
+ASSERT(
+    (_end <= (ORIGIN(RAM) + LENGTH(RAM))),
+    "Error: RAM overflow - data, heap and stack exceed RAM"
+)
+
+ASSERT(
+    (_etext <= (ORIGIN(FLASH) + LENGTH(FLASH))),
+    "Error: FLASH overflow"
+)

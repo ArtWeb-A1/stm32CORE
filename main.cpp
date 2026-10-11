@@ -3,41 +3,98 @@
 
 // ==================== [Variables] ==================== //
 
-	// ==================== [Constants] ==================== //
-	
-
-#define MPU_makeRegionSize = 200U
-
-
 	// ==================== [Structures] ==================== //
 
 
-typedef struct MPU_makeRegion =  // Структура определения региона.
+struct MPURegionConfig  // Структура определения региона.
 {
-	uint32_t P_ID,    // Process ID          - процесс или родственный процесс владеющий регионом.
-	uint32_t R_N,     // Region Num          - номер региона.
-	uint32_t R_BA,    // Region Base Address - начальный адресс региона.
-	uint32_t R_LA,    // Region Last Address - конечный адресс региона.
-	uint8_t R_S,      // Region Shareability - "определяет, может ли память использоваться совместно несколькими агентами системы."
-	uint8_t R_A,      // Region Access       - права чтения/записи.
-	uint8_t R_X,      // Region Executeable  - выполнение кода из региона.
-	uint8_t R_MAIR,   // Region MAIR         - "индекс MAIR".
-	uint8_t R_E,      // Region Enabled      - включен ли регион.
-	uint8_t R_Attr,   // Region Attribute    - атрибут региона.
-	uint32_t offset   //                     - сдвиг до 200 бит.
-	
+	uint32_t PID;    // Process ID          - Процесс или родственный процесс владеющий регионом.
+	uint32_t RN;     // Region Num          - Номер региона.
+	uint32_t RBA;    // Region Base Address - Начальный адрес региона.
+	uint32_t RSz;    // Region Size         - Размер региона.
+	uint8_t RS;      // Region Shareability - "определяет; может ли память использоваться совместно несколькими агентами системы."
+	uint8_t RA;      // Region Access       - Права чтения/записи/исполнения.
+	uint8_t RMAIRI;  // Region MAIR Index   - "индекс MAIR".
+	uint8_t RE;      // Region Enabled      - Включен ли регион.
+	uint8_t RAttr;   // Region Attribute    - Атрибут региона.
 };
 
-MPU_makeRegion MPU_regions[MPU_makeRegionSize*12U] =     // Массив с текущими регионами (включая выключенных).
+struct RegisterContext
 {
-	
-}
+	uint32_t R4;
+	uint32_t R5;
+	uint32_t R6;
+	uint32_t R7;
+	uint32_t R8;
+	uint32_t R9;
+	uint32_t R10;
+	uint32_t R11;
+	uint32_t EXC_RETURN;
+};
 
+struct ProcessControlBlock
+{
+	uint32_t PID;    // Process Id       	    - Номер процесса.
+	uint32_t PPID;   // Parent Process Id	    - Номер родительского процесса.
+	uint8_t PSTATE;  // Process State     	    - Состояние процесса.
+	uint8_t PP;      // Process Priority  	    - Приоретет процесса.
+	uint64_t PCpuT;  // Process Cpu Time        - Рабочее время процесса на CPU. (Сохраняет время в микросекундах).
+	uintptr_t  PSP;  // Process Stack Pointer   - Адрес стека.
+	uintptr_t  PSL;  // Process Stack Last      - Последний адрес стэка.
+	uint32_t PPC;    // Process Program Counter - Значение следующий инструкции процесса.
+	uint32_t PTZ;    // Process Trust Zone      - Состояние trust зоны Secure/Non-secure.
+//	RegisterContext PR; // Process Registers    - Сохранение состояния регистров процессора для данного процесса (нужно сохранять только у потоков так как процесс это маска для нескольких потоков).
+	uint32_t POF;    // Process Open Files      - Все открытые файл процессом.
+	uint32_t PS;     // Process Signal          - Передача сигнала в процесс.
+}; 
+
+struct ThreadControlBlock
+{
+	uint32_t PID;    // Process Id       	    - Номер процесса.
+	uint32_t TID;    // Thread Id               - Номер потока процесса.
+	uint32_t PTID;   // Parent Thread Id  	    - Номер родительского потока процесса.
+	uint8_t TSTATE;  // Thread State      	    - Состояние потока процесса.
+	uint8_t TP;      // Thread Priority  	    - Приоретет потока процесса.
+	uint64_t TCpuT;  // Thread Cpu Time         - Рабочее время потока процесса на CPU. (Сохраняет время в микросекундах).
+	uintptr_t  TSP;  // Process Stack Pointer   - Адрес стека у потока.
+	uintptr_t  TSL;  // Thread Stack Last       - Последний адрес стэка у потока.
+	uint32_t TPC;    // Thread Program Counter   - Значение следующий инструкции процесса.
+	RegisterContext TR;// Thread Registers       - Сохранение состояния регистров процессора для данного процесса
+//	uint32_t TOF;    // Thread Open Files        - Все открытые файл процессом. (все потоки будут иметь доступ к файлам процесса).
+	uint32_t TS;     // Thread Signal            - Передача сигнала в процесс.
+};
+
+// struct PCB_makeProcess							// Первоначальная версия таблици процесса.
+// {
+	// uint32_t PID;    // Process id       	    - Номер процесса.
+	// uint32_t PPID;   // Parent Process id	    - Номер родительского процесса.
+	// uint32_t TID;    // Thread id               - Номер потока процесса.
+	// uint32_t PTID;   // Parent thread id  	    - Номер родительского потока процесса.
+	// uint8_t PSTATE;  // Process state     	    - Состояние процесса.
+	// uint8_t TSTATE;  // Thread state      	    - Состояние потока процесса.
+	// uint8_t PP;      // Process priority  	    - Приоретет процесса.
+	// uint8_t TP;      // Thread priority  	    - Приоретет потока процесса.
+	// uint32_t PCpuT;  // Process Cpu time        - Рабочее время процесса на CPU.
+	// uint32_t TCpuT;  // Thread Cpu time         - Рабочее время потока процесса на CPU.
+	// uint32_t PSP;    // Process stack pointer   - Указатель адреса стека
+	// uint32_t PPC;    // Process program counter - Указатель слудющей инструкции процесса.
+	// PRS_saveRegisters PR;     // Process Registers       - Сохранение состояния регистров процессора для данного процесса
+	// uint32_t POF;    // Process open files      - Все открытые файл процессом.
+	// uint32_t PS;      // Process signal          - Передача сигнала в процесс.
+// };
+
+	// ==================== [Constants] ==================== //
+	
+
+#define MPURegionConfigSize      (sizeof(MPURegionConfig) * 8U)
+#define RegisterContextSize      (sizeof(RegisterContext) * 8U)
+#define ProcessControlBlockSize  (sizeof(ProcessControlBlock) * 8U)
+#define ThreadControlBlockSize   (sizeof(ThreadControlBlock) * 8U)
+
+MPURegionConfig MPU_regions[MPURegionConfigSize*12U] {};     // Массив с текущими регионами (включая выключенных).
 
 // ==================== [Call func prototypes] ==================== //
 
-
-typedef struct MPU_makeRegion MPU_makeRegion;
 
 // void Secure_MPU_Init(void);
 
@@ -46,7 +103,7 @@ typedef struct MPU_makeRegion MPU_makeRegion;
 
 
 int main(void) {
-    HAL_init();
+    HAL_Init();
 
 
     while (1) {
