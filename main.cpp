@@ -8,8 +8,8 @@
 
 struct MPURegionConfig     // Структура определения региона.
 {
-	uint32_t PID;    // Process ID          - Процесс или родственный процесс владеющий регионом.
-	uint32_t RN;     // Region Num          - Номер региона.
+	uint16_t PID;    // Process ID          - Процесс или родственный процесс владеющий регионом.
+	uint16_t RN;     // Region Num          - Номер региона.
 	uint32_t RBA;    // Region Base Address - Начальный адрес региона.
 	uint32_t RSz;    // Region Size         - Размер региона.
 	uint8_t RS;      // Region Shareability - "определяет; может ли память использоваться совместно несколькими агентами системы."
