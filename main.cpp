@@ -65,7 +65,7 @@ struct ProcessControlBlock // Структура определения проц
 	uint32_t PTZ;    // Process Trust Zone      - Состояние trust зоны Secure/Non-secure.
 	uint32_t POF;    // Process Open Files      - Все открытые файл процессом.
 	int16_t PS;     // Process Signal          - Передача сигнала в процесс.
-	ThreadControlBlock TIDs[MAX_TIDs_PER_PROCESS];
+	ThreadControlBlock* TIDs[MAX_TIDs_PER_PROCESS];
 	uint16_t TLast;
 }; 
 
@@ -96,6 +96,13 @@ uint16_t ProcessLast    = 0;
 ThreadControlBlock *scheduler(void) 
 {
 	bool ThreadIsReady = false;
+
+	if (ProcessCount == 0)
+	{
+		// Вызвать PID 0 idle
+		return NULL;
+	}
+	
 	for (uint16_t pCount=1; pCount<=ProcessCount; pCount++)         // Перебор всех процессов.
 	{
 		uint16_t pNum = (ProcessLast + pCount) % ProcessCount;		// Подсчет следующего процесса.
@@ -123,9 +130,10 @@ ThreadControlBlock *scheduler(void)
 			}
 		}
 	}
-	if (ThreadIsReady == false).                                    // Idle состояние.
+	if (ThreadIsReady == false)                                   // Idle состояние.
 	{
 		// Вызывать PID 0 Idle.
+		return NULL;
 	}
 }
 
