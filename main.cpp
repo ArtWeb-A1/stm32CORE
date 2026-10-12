@@ -48,8 +48,7 @@ struct ThreadControlBlock  // Структура определения пото
 	uintptr_t  TSP;  // Process Stack Pointer   - Адрес стека у потока.
 	uintptr_t  TSL;  // Thread Stack Last       - Последний адрес стэка у потока.
 	uint32_t TPC;    // Thread Program Counter   - Значение следующий инструкции процесса.
-	RegisterContext TR;// Thread Registers       - Сохранение состояния регистров процессора для данного процесса
-//	uint32_t TOF;    // Thread Open Files        - Все открытые файл процессом. (все потоки будут иметь доступ к файлам процесса).
+	RegisterContext TR;// Thread Registers       - Сохранение состояния регистров процессора для данного процесса.
 	int16_t TS;     // Thread Signal            - Передача сигнала в процесс.
 };
 
@@ -64,33 +63,11 @@ struct ProcessControlBlock // Структура определения проц
 	uintptr_t  PSL;  // Process Stack Last      - Последний адрес стэка.
 	uint32_t PPC;    // Process Program Counter - Значение следующий инструкции процесса.
 	uint32_t PTZ;    // Process Trust Zone      - Состояние trust зоны Secure/Non-secure.
-//	RegisterContext PR; // Process Registers    - Сохранение состояния регистров процессора для данного процесса (нужно сохранять только у потоков так как процесс это маска для нескольких потоков).
 	uint32_t POF;    // Process Open Files      - Все открытые файл процессом.
 	int16_t PS;     // Process Signal          - Передача сигнала в процесс.
-//  uint16_t TCount;
-//	uint16_t TLast;
 	ThreadControlBlock TIDs[MAX_TIDs_PER_PROCESS];
 	uint16_t TLast;
 }; 
-
-// struct PCB_makeProcess							// Первоначальная версия таблици процесса.
-// {
-	// uint32_t PID;    // Process id       	    - Номер процесса.
-	// uint32_t PPID;   // Parent Process id	    - Номер родительского процесса.
-	// uint32_t TID;    // Thread id               - Номер потока процесса.
-	// uint32_t PTID;   // Parent thread id  	    - Номер родительского потока процесса.
-	// uint8_t PSTATE;  // Process state     	    - Состояние процесса.
-	// uint8_t TSTATE;  // Thread state      	    - Состояние потока процесса.
-	// uint8_t PP;      // Process priority  	    - Приоретет процесса.
-	// uint8_t TP;      // Thread priority  	    - Приоретет потока процесса.
-	// uint32_t PCpuT;  // Process Cpu time        - Рабочее время процесса на CPU.
-	// uint32_t TCpuT;  // Thread Cpu time         - Рабочее время потока процесса на CPU.
-	// uint32_t PSP;    // Process stack pointer   - Указатель адреса стека
-	// uint32_t PPC;    // Process program counter - Указатель слудющей инструкции процесса.
-	// PRS_saveRegisters PR;     // Process Registers       - Сохранение состояния регистров процессора для данного процесса
-	// uint32_t POF;    // Process open files      - Все открытые файл процессом.
-	// uint32_t PS;      // Process signal          - Передача сигнала в процесс.
-// };
 
 	// ==================== [Constants] ==================== //
 	
@@ -106,7 +83,7 @@ ThreadControlBlock  ThreadList[MAX_THREADS_IN_LIST]  {};    // Массив со
 
 uint16_t ProcessCount   = 0;
 uint16_t ProcessLast    = 0;
-// uint16_t ThreadLast     = 0;
+
 // ==================== [Call func prototypes] ==================== //
 
 // Базовое значение кванта для тестирования 1мс. В будующем будет меняться по мере развития структуры и тестирования.
@@ -152,9 +129,6 @@ ThreadControlBlock *scheduler(void)
 	}
 }
 
-// void Secure_MPU_Init(void);
-
-
 // ==================== [Main function] ==================== //
 
 int main(void) 
@@ -167,80 +141,3 @@ int main(void)
 }
 
 // ==================== [Another functions] ==================== //
-
-
-
-// void Secure_MPU_Init(void)
-// {
-    // // Отключаем MPU, чтобы безопасно изменить его настройки.
-    // // Это не отключает TrustZone и не меняет атрибуцию Secure/Non-secure.
-    // ARM_MPU_Disable();
-
-    // // MAIR0 — регистр атрибутов памяти.
-    // // 0x44 задаёт Attr0 = 0x44.
-    // // 0x44 означает Normal memory, non-cacheable.
-    // // Регион с AttrIndx = 0 будет использовать этот атрибут.
-    // MPU->MAIR0 = 0x44U;
-
-    // // RNR (Region Number Register) выбирает регион MPU,
-    // // настройки которого мы будем изменять.
-    // // Значение 0 означает регион №0.
-    // MPU->RNR = 0U;
-
-    // // RBAR (Region Base Address Register) задаёт:
-    // // базовый адрес региона, shareability, права доступа и XN.
-
-    // MPU->RBAR =
-        // (0x30000000U & MPU_RBAR_BASE_Msk) |
-        // // Базовый адрес региона: 0x30000000.
-        // // Маска оставляет только биты адреса, разрешённые RBAR.
-
-        // (0U << MPU_RBAR_SH_Pos) |
-        // // SH = 0: память не помечается как shareable.
-        // // Это подходящий вариант для обычной локальной SRAM,
-        // // если архитектура системы не требует другого.
-
-        // (1U << MPU_RBAR_AP_Pos) |
-        // // AP = 1: доступ на чтение и запись только
-        // // из привилегированного режима.
-        // // Непривилегированный код не получит доступ.
-
-        // MPU_RBAR_XN_Msk;
-        // // XN = 1: Execute Never.
-        // // Запрещает выполнение инструкций из этого региона.
-
-    // // RLAR (Region Limit Address Register) задаёт:
-    // // верхнюю границу региона, индекс атрибута и включение региона.
-
-    // MPU->RLAR =
-        // (0x30007FFFU & MPU_RLAR_LIMIT_Msk) |
-        // // Последний адрес региона — 0x30007FFF.
-        // // Границы RLAR задаются с точностью 32 байта,
-        // // младшие биты адреса не хранятся.
-        // // В данном примере диапазон равен 32 КБ.
-
-        // (0U << MPU_RLAR_AttrIndx_Pos) |
-        // // AttrIndx = 0: использовать Attr0 из MAIR0.
-        // // Поэтому память получит атрибут 0x44.
-
-        // MPU_RLAR_EN_Msk;
-        // // EN = 1: включить регион №0.
-
-    // // DSB ждёт завершения предыдущих операций с памятью
-    // // и завершения предыдущих обращений к периферии.
-    // __DSB();
-
-    // // ISB сбрасывает конвейер инструкций, чтобы последующие
-    // // инструкции выполнялись с учётом новых настроек MPU.
-    // __ISB();
-
-    // // Включаем MPU.
-    // // Аргумент 0 означает: PRIVDEFENA = 0.
-    // // Не использовать стандартную карту памяти как fallback
-    // // для привилегированных обращений, не покрытых регионом.
-    // ARM_MPU_Enable(0U);
-
-    // // Синхронизация после включения MPU.
-    // __DSB();
-    // __ISB();
-// }
