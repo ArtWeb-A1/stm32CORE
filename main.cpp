@@ -3,7 +3,10 @@
 
 // ==================== [Variables] ==================== //
 
-#define MAX_TIDs_PER_PROCESS 4
+#define MAX_TIDs_PER_PROCESS 4U
+#define MAX_MPU_REGIONS      12U
+#define MAX_PROCESS_IN_LIST  16U
+#define MAX_THREADS_IN_LIST  64U 
 
 	// ==================== [Structures] ==================== //
 
@@ -97,9 +100,9 @@ struct ProcessControlBlock // Структура определения проц
 #define ProcessControlBlockSize  (sizeof(ProcessControlBlock) * 8U)
 #define ThreadControlBlockSize   (sizeof(ThreadControlBlock) * 8U)
 
-MPURegionConfig MPU_regions[MPURegionConfigSize*12U] {};        // Массив с текущими регионами (включая выключенных).
-ProcessControlBlock ProcessList[ProcessControlBlockSize*16U] {}; // Массив со всеми текущими процессами.
-ThreadControlBlock ThreadList[ThreadControlBlockSize*64U] {};    // Массив со всеми текущими потоками.
+MPURegionConfig     MPU_regions[MAX_MPU_REGIONS]     {};        // Массив с текущими регионами (включая выключенных).
+ProcessControlBlock ProcessList[MAX_PROCESS_IN_LIST] {}; // Массив со всеми текущими процессами.
+ThreadControlBlock  ThreadList[MAX_THREADS_IN_LIST]  {};    // Массив со всеми текущими потоками.
 
 uint16_t ProcessCount   = 0;
 uint16_t ProcessLast    = 0;
