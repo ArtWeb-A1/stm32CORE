@@ -3,6 +3,8 @@
 
 // ==================== [Variables] ==================== //
 
+#define MAX_TIDs_PER_PROCESS 4
+
 	// ==================== [Structures] ==================== //
 
 
@@ -32,22 +34,6 @@ struct RegisterContext     // Структура сохранения конте
 	uint32_t EXC_RETURN;
 };
 
-struct ProcessControlBlock // Структура определения процесса.
-{
-	uint16_t PID;    // Process Id       	    - Номер процесса.
-	uint16_t PPID;   // Parent Process Id	    - Номер родительского процесса.
-	uint8_t PSTATE;  // Process State     	    - Состояние процесса.
-	uint8_t PP;      // Process Priority  	    - Приоретет процесса.
-	uint64_t PCpuT;  // Process Cpu Time        - Рабочее время процесса на CPU. (Сохраняет время в микросекундах).
-	uintptr_t  PSP;  // Process Stack Pointer   - Адрес стека.
-	uintptr_t  PSL;  // Process Stack Last      - Последний адрес стэка.
-	uint32_t PPC;    // Process Program Counter - Значение следующий инструкции процесса.
-	uint32_t PTZ;    // Process Trust Zone      - Состояние trust зоны Secure/Non-secure.
-//	RegisterContext PR; // Process Registers    - Сохранение состояния регистров процессора для данного процесса (нужно сохранять только у потоков так как процесс это маска для нескольких потоков).
-	uint32_t POF;    // Process Open Files      - Все открытые файл процессом.
-	int16_t PS;     // Process Signal          - Передача сигнала в процесс.
-}; 
-
 struct ThreadControlBlock  // Структура определения потока процесса.
 {
 	uint16_t PID;    // Process Id       	    - Номер процесса.
@@ -63,6 +49,26 @@ struct ThreadControlBlock  // Структура определения пото
 //	uint32_t TOF;    // Thread Open Files        - Все открытые файл процессом. (все потоки будут иметь доступ к файлам процесса).
 	int16_t TS;     // Thread Signal            - Передача сигнала в процесс.
 };
+
+struct ProcessControlBlock // Структура определения процесса.
+{
+	uint16_t PID;    // Process Id       	    - Номер процесса.
+	uint16_t PPID;   // Parent Process Id	    - Номер родительского процесса.
+	uint8_t PSTATE;  // Process State     	    - Состояние процесса.
+	uint8_t PP;      // Process Priority  	    - Приоретет процесса.
+	uint64_t PCpuT;  // Process Cpu Time        - Рабочее время процесса на CPU. (Сохраняет время в микросекундах).
+	uintptr_t  PSP;  // Process Stack Pointer   - Адрес стека.
+	uintptr_t  PSL;  // Process Stack Last      - Последний адрес стэка.
+	uint32_t PPC;    // Process Program Counter - Значение следующий инструкции процесса.
+	uint32_t PTZ;    // Process Trust Zone      - Состояние trust зоны Secure/Non-secure.
+//	RegisterContext PR; // Process Registers    - Сохранение состояния регистров процессора для данного процесса (нужно сохранять только у потоков так как процесс это маска для нескольких потоков).
+	uint32_t POF;    // Process Open Files      - Все открытые файл процессом.
+	int16_t PS;     // Process Signal          - Передача сигнала в процесс.
+//  uint16_t TCount;
+//	uint16_t TLast;
+	ThreadControlBlock TIDs[MAX_TIDs_PER_PROCESS];
+	uint16_t TLast;
+}; 
 
 // struct PCB_makeProcess							// Первоначальная версия таблици процесса.
 // {
@@ -95,32 +101,51 @@ MPURegionConfig MPU_regions[MPURegionConfigSize*12U] {};        // Массив 
 ProcessControlBlock ProcessList[ProcessControlBlockSize*16U] {}; // Массив со всеми текущими процессами.
 ThreadControlBlock ThreadList[ThreadControlBlockSize*64U] {};    // Массив со всеми текущими потоками.
 
-uint16_t ProcessCount = 0;
-
+uint16_t ProcessCount   = 0;
+uint16_t ProcessLast    = 0;
+// uint16_t ThreadLast     = 0;
 // ==================== [Call func prototypes] ==================== //
 
 // Базовое значение кванта для тестирования 1мс. В будующем будет меняться по мере развития структуры и тестирования.
 
+// В текущий момент реализована системма переключения по потоком, что лучше распределяет ресурсы по потокам.
+// Программа А имеет 3 потока.
+// Программа Б имеет 1 поток.
+// А1 -> Б1 -> А2 -> Б1 -> А3
+
 ThreadControlBlock *scheduler(void) 
 {
 	bool ThreadIsReady = false;
-	if (ProcessCount == 0)
+	for (uint16_t pCount=1; pCount<=ProcessCount; pCount++)         // Перебор всех процессов.
 	{
-		// Вызывать PID 0 Idle.
-	} else
-	{
-		for (uint16_t i=0; i<ProcessCount; i++)         // Перебор всех процессов.
+		uint16_t pNum = (ProcessLast + pCount) % ProcessCount;		// Подсчет следующего процесса.
+		// ProcessLast = pNum;
+		if (ProcessList[pNum].PSTATE == READY)                      // Проверка процесса на готовность.
 		{
-			if (ProcessList[i].PSTATE == PROCESS_READY) // PROCESS_READY - макрос значение для ready процесса.
+			// Анализ статуса потока и запуск его выполнения.
+			for (uint16_t tCount=1; tCount<=MAX_TIDs_PER_PROCESS; tCount++) // Перебор всех потоков процесса.
 			{
-				// ProcessIsReady = true;
-				// Процесс готов к выполнению. Нужно переходить к проверке потока.
+				uint16_t tNum = (ProcessList[pNum].TLast + tCount) % MAX_TIDs_PER_PROCESS; // Подсчет следующего потока.
+				
+				if (ProcessList[pNum].TIDs[tNum] != NULL)           // Проверка существования потока.
+				{
+					if (ProcessList[pNum].TIDs[tNum]->TSTATE == READY)  // Проверка потока на готовность.
+					{
+						// Логика переключения процесса
+						ProcessLast = pNum;                         // Замена значения последнего процесса. 
+						ProcessList[pNum].TLast = tNum;             // Замена значения последнего потока.
+
+
+						
+						return ProcessList[pNum].TIDs[tNum];        // Завершаем цикл.
+					}
+				}
 			}
 		}
-		if (ThreadIsReady == false)
-		{
-			// Вызывать PID 0 Idle.
-		}
+	}
+	if (ThreadIsReady == false).                                    // Idle состояние.
+	{
+		// Вызывать PID 0 Idle.
 	}
 }
 
