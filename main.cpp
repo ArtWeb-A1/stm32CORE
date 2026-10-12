@@ -8,6 +8,8 @@
 #define MAX_PROCESS_IN_LIST  16U
 #define MAX_THREADS_IN_LIST  64U 
 
+#define READY               0x00
+
 	// ==================== [Structures] ==================== //
 
 
@@ -114,13 +116,14 @@ ThreadControlBlock *scheduler(void)
 			{
 				uint16_t tNum = (ProcessList[pNum].TLast + tCount) % MAX_TIDs_PER_PROCESS; // Подсчет следующего потока.
 				
-				if (ProcessList[pNum].TIDs[tNum] != NULL)           // Проверка существования потока.
+				if (ProcessList[pNum].TIDs[tNum] != NULL)               // Проверка существования потока.
 				{
 					if (ProcessList[pNum].TIDs[tNum]->TSTATE == READY)  // Проверка потока на готовность.
 					{
 						// Логика переключения процесса
-						ProcessLast = pNum;                         // Замена значения последнего процесса. 
+						ProcessLast             = pNum;             // Замена значения последнего процесса. 
 						ProcessList[pNum].TLast = tNum;             // Замена значения последнего потока.
+						ThreadIsReady           = true;
 
 
 						
@@ -130,11 +133,12 @@ ThreadControlBlock *scheduler(void)
 			}
 		}
 	}
-	if (ThreadIsReady == false)                                   // Idle состояние.
+	if (ThreadIsReady == false)                                    // Idle состояние.
 	{
 		// Вызывать PID 0 Idle.
 		return NULL;
 	}
+	return NULL;
 }
 
 // ==================== [Main function] ==================== //
