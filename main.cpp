@@ -93,6 +93,8 @@ ThreadControlBlock  ThreadList[MAX_THREADS_IN_LIST]  {};    // Массив со
 
 uint16_t ProcessCount   = 0;
 uint16_t PIDCount       = 1;
+uint8_t PIDFree[65536 / 8] = {0};		// 0 - PID свободен. 1 - PID занят.
+
 uint16_t ProcessLast    = 65535;
 uint16_t ThreadLast     = 65535;
 
@@ -309,7 +311,7 @@ ThreadControlBlock *scheduler(void)
 	}
 	return NULL;
 }
-
+	
 ProcessControlBlock* createProcess()
 {
 	if (ProcessCount >= MAX_PROCESS_IN_LIST)
@@ -320,18 +322,28 @@ ProcessControlBlock* createProcess()
 	{
 		PIDCount = 1;
 	}
-	for (uint16_t pcPID = 0; pcPID < MAX_PROCESS_IN_LIST; pcPID++)
+	for (uint16_t pcPID = PIDCount+1; pcPID <= 65535; pcPID++)  // PIDCount это последний созданый PID соответственно PIDCount+1 это PID создоваемого процесса.
 	{
-		if (ProcessList[pcPID] == NULL && pcPID != 0)
+		if (pcPID == PIDCount)
 		{
-			
+			return NULL;
 		}
-		if (ProcessList[pcPID].PID == PIDCount)
+		if (((PIDFree[pcPID / 8] >> (pcPID % 8)) & 1u) == 0)
 		{
-			PIDCount++;
+			PIDCount = pcPID;
+			break;
+		} 
+		if (pcPID == 65535)
+		{
 			pcPID = 0;
-		}
+		} 
+			// bitmap[index / 8] |= (uint8_t)(1u << (index % 8)); // Записать 1
+			// bitmap[index / 8] &= (uint8_t)~(1u << (index % 8)); // Записать 0
+			// uint8_t value = (bitmap[index / 8] >> (index % 8)) & 1u; // Прочитать бит
 	}
+	
+	PIDFree[PIDCount / 8] |= (uint8_t)(1u << (PIDCount % 8));
+	
 }
 
 // ==================== [Main function] ==================== //
