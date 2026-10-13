@@ -79,16 +79,7 @@ struct ProcessControlBlock // Структура определения проц
 #define RegisterContextSize      (sizeof(RegisterContext) * 8U)       // Размер 
 #define ProcessControlBlockSize  (sizeof(ProcessControlBlock) * 8U)
 #define ThreadControlBlockSize   (sizeof(ThreadControlBlock) * 8U)
-#define TSP_OFFSET \
-    offsetof(ThreadControlBlock, TSP)
 
-#define TR_OFFSET \
-    offsetof(ThreadControlBlock, TR)
-
-#define EXC_RETURN_OFFSET \
-    (offsetof(ThreadControlBlock, TR) + \
-     offsetof(RegisterContext, EXC_RETURN))
-	 
 static_assert(offsetof(ThreadControlBlock, TSP) % 4 == 0,
               "TSP must be word-aligned");
 
