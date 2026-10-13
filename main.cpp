@@ -92,6 +92,7 @@ ProcessControlBlock ProcessList[MAX_PROCESS_IN_LIST] {}; // Массив со в
 ThreadControlBlock  ThreadList[MAX_THREADS_IN_LIST]  {};    // Массив со всеми текущими потоками.
 
 uint16_t ProcessCount   = 0;
+uint16_t PIDCount       = 1;
 uint16_t ProcessLast    = 65535;
 uint16_t ThreadLast     = 65535;
 
@@ -307,6 +308,30 @@ ThreadControlBlock *scheduler(void)
 		return NULL;
 	}
 	return NULL;
+}
+
+ProcessControlBlock* createProcess()
+{
+	if (ProcessCount >= MAX_PROCESS_IN_LIST)
+	{
+		return NULL;
+	}
+	if (PIDCount == 65535)
+	{
+		PIDCount = 1;
+	}
+	for (uint16_t pcPID = 0; pcPID < MAX_PROCESS_IN_LIST; pcPID++)
+	{
+		if (ProcessList[pcPID] == NULL && pcPID != 0)
+		{
+			
+		}
+		if (ProcessList[pcPID].PID == PIDCount)
+		{
+			PIDCount++;
+			pcPID = 0;
+		}
+	}
 }
 
 // ==================== [Main function] ==================== //
