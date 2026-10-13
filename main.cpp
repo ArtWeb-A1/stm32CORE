@@ -10,6 +10,7 @@
 #define MAX_THREADS_IN_LIST  64U 
 
 #define READY               0x00
+#define RUNNING             0x01
 
 	// ==================== [Structures] ==================== //
 
@@ -94,6 +95,9 @@ uint16_t ProcessCount   = 0;
 uint16_t ProcessLast    = 65535;
 uint16_t ThreadLast     = 65535;
 
+volatile uint8_t switch_pending = 0;
+volatile uint8_t quantum_left   = 0;
+
 ThreadControlBlock* last_thread    = nullptr;
 ThreadControlBlock* current_thread = nullptr;
 
@@ -110,10 +114,7 @@ extern "C" __attribute__((naked))
 void PendSV_Handler(void)
 {
     asm volatile(
-        // =========================================
         // 1. Сохранить контекст last_thread
-        // =========================================
-
         "ldr   r0, =last_thread       \n"
         "ldr   r0, [r0]               \n"
         "cbz   r0, 1f                 \n"
@@ -131,19 +132,13 @@ void PendSV_Handler(void)
         // Сохранить EXC_RETURN
         "str   lr, [r2, #32]          \n"
 
-        // =========================================
         // 2. Получить current_thread
-        // =========================================
-
         "1:                           \n"
         "ldr   r0, =current_thread    \n"
         "ldr   r0, [r0]               \n"
         "cbz   r0, 2f                 \n"
-
-        // =========================================
+		
         // 3. Восстановить стек нового потока
-        // =========================================
-
         "ldr   r1, [r0, #16]          \n" // TSP
         "msr   psp, r1                \n"
 
@@ -155,19 +150,25 @@ void PendSV_Handler(void)
 
         // Восстановить EXC_RETURN
         "ldr   lr, [r2, #32]          \n"
-
-        // =========================================
-        // 4. Возврат в новый поток
-        // =========================================
-
-        "bx    lr                     \n"
-
-        // Нет текущего потока
-        "2:                           \n"
-        "bx    lr                     \n"
+		
+		"2:                        \n"
+		"ldr   r3, =switch_pending \n" // r3 = адрес флага
+		"movs  r2, #0              \n" // r2 = 0
+		"strb  r2, [r3]            \n" // планировщик снова разрешён
+		"bx    lr                  \n"
     );
 }
 
+extern "C" void SysTick_Handler(void)
+{
+    HAL_IncTick();
+    if (current_thread) {
+        current_thread->TCpuT += 1000;                    // 1 мс в мкс
+        if (current_thread->TSTATE != READY) quantum_left = 0;
+    }
+    if (quantum_left) quantum_left--;
+    if (quantum_left == 0) scheduler();
+}
 
 /*
  * TODO: Подготовка и развитие RTOS.
@@ -246,6 +247,9 @@ void PendSV_Handler(void)
 
 ThreadControlBlock *scheduler(void) 
 {
+	if (switch_pending) return NULL;
+	if (current_thread && current_thread->TSTATE == RUNNING) current_thread->TSTATE = READY;
+	
 	bool ThreadIsReady = false;
 
 	if (ProcessCount == 0)
@@ -275,8 +279,13 @@ ThreadControlBlock *scheduler(void)
 						}
 						
 						current_thread = ProcessList[pNum].TIDs[tNum];
+
+						quantum_left = 1;
+						current_thread->TSTATE = RUNNING;
+						
 						if (last_thread != current_thread)
-						{
+						{	
+							switch_pending = 1;
 							SCB->ICSR = SCB_ICSR_PENDSVSET_Msk;
 						}
 						
@@ -285,8 +294,6 @@ ThreadControlBlock *scheduler(void)
 						ThreadLast              = tNum; 
 						ProcessList[pNum].TLast = tNum;             // Замена значения последнего потока.
 						ThreadIsReady           = true;
-						
-						
 						
 						return ProcessList[pNum].TIDs[tNum];        // Завершаем цикл.
 					}
@@ -308,23 +315,6 @@ int main(void)
 {
     HAL_Init();
 
-
-	// Скрипты чтобы узнать смещение блоков.
-	// volatile uint32_t tsp_offset =
-		// offsetof(ThreadControlBlock, TSP);
-
-	// volatile uint32_t tr_offset =
-		// offsetof(ThreadControlBlock, TR);
-
-	// volatile uint32_t exc_return_offset =
-		// offsetof(ThreadControlBlock, TR) +
-		// offsetof(RegisterContext, EXC_RETURN);
-	// static_assert(offsetof(ThreadControlBlock, TSP) == 17,
-              // "TSP offset is not 16");
-
-	// static_assert(offsetof(ThreadControlBlock, TR) == 28,
-				  // "TR offset is not 28");
-	
     while (1) {
     }
 }
