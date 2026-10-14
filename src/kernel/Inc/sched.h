@@ -56,14 +56,15 @@ struct ProcessControlBlock // Структура определения проц
 	uint16_t PID;    // Process Id       	    - Номер процесса.
 	uint16_t PPID;   // Parent Process Id	    - Номер родительского процесса.
 	uint8_t PSTATE;  // Process State     	    - Состояние процесса.
-	uint8_t PP;      // Process Priority  	    - Приоретет процесса.
+	uint8_t PP;      // Process Priority  	    - Приоретет процесса. Приоретет работает следующем оброзом:
+					 // 						  255 - наименьший приоритет. 0 - наивысший приоритет.
 	uint64_t PCpuT;  // Process Cpu Time        - Рабочее время процесса на CPU. (Сохраняет время в микросекундах).
 	uintptr_t  PSP;  // Process Stack Pointer   - Адрес стека.
 	uintptr_t  PSL;  // Process Stack Last      - Последний адрес стэка.
 	uint32_t PPC;    // Process Program Counter - Значение следующий инструкции процесса.
 	uint32_t PTZ;    // Process Trust Zone      - Состояние trust зоны Secure/Non-secure.
 	uint32_t POF;    // Process Open Files      - Все открытые файл процессом.
-	int16_t PS;     // Process Signal          - Передача сигнала в процесс.
+	int16_t PS;      // Process Signal          - Передача сигнала в процесс.
 	ThreadControlBlock* TIDs[MAX_TIDs_PER_PROCESS];
 	uint16_t TLast;
 }; 

@@ -1,7 +1,8 @@
 #include "sched.h"
 
-#define READY               0x00		// В будующем вынести в отдельный файл с глобальными перемеными. 
-#define RUNNING             0x01
+#define NEW                 0x00
+#define READY               0x01		// В будующем вынести в отдельный файл с глобальными перемеными. 
+#define RUNNING             0x02
 
 uint16_t ProcessCount   = 0;
 uint16_t PIDCount       = 1;
@@ -232,7 +233,7 @@ ThreadControlBlock *scheduler(void)
 	return NULL;
 }
 	
-ProcessControlBlock* createProcess(void)
+ProcessControlBlock* createProcess(uint16_t PPID, uint8_t PPriority)
 {
 	if (ProcessCount >= MAX_PROCESS_IN_LIST)
 	{
@@ -263,6 +264,13 @@ ProcessControlBlock* createProcess(void)
 	}
 	
 	PIDFree[PIDCount / 8] |= (uint8_t)(1u << (PIDCount % 8));
+	
+	ProcessList[PIDCount-1].PID    = PIDCount;
+	ProcessList[PIDCount-1].PPID   = PPID;
+	ProcessList[PIDCount-1].PSTATE = NEW;
+	ProcessList[PIDCount-1].PP     = PPriority;
+	ProcessList[PIDCount-1].PCpuT  = 0;
+	
 	
 	return NULL;
 }
