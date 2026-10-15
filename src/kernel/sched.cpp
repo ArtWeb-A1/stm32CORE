@@ -8,6 +8,10 @@ uint16_t ProcessCount   = 0;
 uint16_t PIDCount       = 1;
 uint8_t PIDFree[65536 / 8] = {0};		// 0 - PID свободен. 1 - PID занят.
 
+uint16_t ThreadCount = 0;
+uint16_t TIDCount    = 0;
+uint8_t TIDFree[65536 / 8] = {0};
+
 uint16_t ProcessLast    = 65535;
 uint16_t ThreadLast     = 65535;
 
@@ -265,15 +269,77 @@ ProcessControlBlock* createProcess(uint16_t PPID, uint8_t PPriority)
 
 	PIDCount++; 
 
-	PIDFree[PIDCount / 8] |= (uint8_t)(1u << (PIDCount % 8)); 
+	PIDFree[PIDCount / 8] |= (uint8_t)(1u << (PIDCount % 8));
 
 	ProcessList[PIDCount].PID = PIDCount; 
 	ProcessList[PIDCount].PPID = PPID; 
-	ProcessList[PIDCount].PSTATE = NEW; 
+	ProcessList[PIDCount].PSTATE = READY;
 	ProcessList[PIDCount].PP = PPriority; 
 	ProcessList[PIDCount].PCpuT = 0; 
 	ProcessList[PIDCount].PTZ = 0; 
 	ProcessList[PIDCount].PS = 0; 
 
 	return ProcessList[PIDCount]; 
+}
+
+ThreadList* createThread(uint16_t PID, uint16_t PTID)
+{
+	if (TIDCount == MAX_TREADS_IN_LIST)
+	{
+		return NULL;
+	}
+	if (TIDCount == 65535)
+	{
+		TIDCount = 0;
+	}
+	for (uint16_t pcTID = TIDCount+1; pcTID <= 65535; pcTID++)
+	{
+		if (pcTID == TIDCount)
+		{
+			return NULL;
+		}
+		if (((ThreadList[pcTID / 8] >> (pcTID % 8)) & 1u) == 0)
+		{
+			TIDCount == pcTID;
+			break;
+		}
+	}
+
+	uint16_t PPID = 0;
+	
+	TIDCount++;
+
+	TIDFree[TIDCount / 8] |= (uint8_t)(1u << (TIDCount % 8)); 
+
+	for (uint16_t PIDFound = 0; PIDFound <= MAX_PROCESS_IN_LIST; PIDFound++)
+	{
+		if (ProcessList[PIDFound].PID == PID)
+		{
+			for (uint16_t )
+			PPID = 0;
+			break;
+		}
+		if (PIDFound < MAX_PROCESS_IN_LIST)
+		{
+			return NULL;
+		}
+	}
+
+	ThreadsList[TIDCount].PID    = PID;
+	ThreadsList[TIDCount].TID    = TIDCount;
+	ThreadsList[TIDCount].PTID   = PTID;
+	ThreadsList[TIDCount].TSTATE = READY;
+	ThreadsList[TIDCount].TP     = ProcessList[PPID].PP;
+	ThreadsList[TIDCount].TCpuT  = 0;
+	ThreadsList[TIDCount].TS     = 0;
+	ProcessList[PPID].TLast      = 0;
+	for (uint8_t TIDsCount = 0; TIDsCount < MAX_TIDs_PER_PROCESS; TIDsCount++)
+	{
+		if (ProcessList[PPID].TIDs[TIDsCount] == nullptr)
+		{
+			ProcessList[PPID].TIDs = &ThreadsList[TIDCount];
+			return ThreadsList[TIDCount];
+		}
+	}
+	return NULL;
 }
