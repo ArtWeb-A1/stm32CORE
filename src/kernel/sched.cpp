@@ -282,7 +282,7 @@ ProcessControlBlock* createProcess(uint16_t PPID, uint8_t PPriority)
 	return ProcessList[PIDCount]; 
 }
 
-ThreadList* createThread(uint16_t PID, uint16_t PTID)
+ThreadControlBlock* createThread(uint16_t PID, uint16_t PTID)
 {
 	if (TIDCount == MAX_TREADS_IN_LIST)
 	{
