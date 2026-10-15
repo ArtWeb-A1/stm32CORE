@@ -262,15 +262,18 @@ ProcessControlBlock* createProcess(uint16_t PPID, uint8_t PPriority)
 			// bitmap[index / 8] &= (uint8_t)~(1u << (index % 8)); // Записать 0
 			// uint8_t value = (bitmap[index / 8] >> (index % 8)) & 1u; // Прочитать бит
 	}
-	
-	PIDFree[PIDCount / 8] |= (uint8_t)(1u << (PIDCount % 8));
-	
-	ProcessList[PIDCount-1].PID    = PIDCount;
-	ProcessList[PIDCount-1].PPID   = PPID;
-	ProcessList[PIDCount-1].PSTATE = NEW;
-	ProcessList[PIDCount-1].PP     = PPriority;
-	ProcessList[PIDCount-1].PCpuT  = 0;
-	
-	
-	return NULL;
+
+	PIDCount++; 
+
+	PIDFree[PIDCount / 8] |= (uint8_t)(1u << (PIDCount % 8)); 
+
+	ProcessList[PIDCount].PID = PIDCount; 
+	ProcessList[PIDCount].PPID = PPID; 
+	ProcessList[PIDCount].PSTATE = NEW; 
+	ProcessList[PIDCount].PP = PPriority; 
+	ProcessList[PIDCount].PCpuT = 0; 
+	ProcessList[PIDCount].PTZ = 0; 
+	ProcessList[PIDCount].PS = 0; 
+
+	return ProcessList[PIDCount]; 
 }
