@@ -267,19 +267,19 @@ ProcessControlBlock* createProcess(uint16_t PPID, uint8_t PPriority)
 			// uint8_t value = (bitmap[index / 8] >> (index % 8)) & 1u; // Прочитать бит
 	}
 
-	PocessCount++; 
+	ProcessCount++; 
 
 	PIDFree[PIDCount / 8] |= (uint8_t)(1u << (PIDCount % 8));
 
-	ProcessList[PocessCount].PID = PIDCount; 
-	ProcessList[PocessCount].PPID = PPID; 
-	ProcessList[PocessCount].PSTATE = READY;
-	ProcessList[PocessCount].PP = PPriority; 
-	ProcessList[PocessCount].PCpuT = 0; 
-	ProcessList[PocessCount].PTZ = 0; 
-	ProcessList[PocessCount].PS = 0; 
+	ProcessList[ProcessCount-1].PID = PIDCount; 
+	ProcessList[ProcessCount-1].PPID = PPID; 
+	ProcessList[ProcessCount-1].PSTATE = READY;
+	ProcessList[ProcessCount-1].PP = PPriority; 
+	ProcessList[ProcessCount-1].PCpuT = 0; 
+	ProcessList[ProcessCount-1].PTZ = 0; 
+	ProcessList[ProcessCount-1].PS = 0; 
 
-	return ProcessList[PocessCount]; 
+	return ProcessList[PocessCount-1]; 
 }
 
 ThreadControlBlock* createThread(uint16_t PID, uint16_t PTID)
@@ -298,9 +298,9 @@ ThreadControlBlock* createThread(uint16_t PID, uint16_t PTID)
 		{
 			return NULL;
 		}
-		if (((ThreadList[pcTID / 8] >> (pcTID % 8)) & 1u) == 0)
+		if (((TIDFree[pcTID / 8] >> (pcTID % 8)) & 1u) == 0)
 		{
-			TIDCount == pcTID;
+			TIDCount = pcTID;
 			break;
 		}
 	}
@@ -329,7 +329,10 @@ ThreadControlBlock* createThread(uint16_t PID, uint16_t PTID)
 	ThreadsList[ThreadCount].TID    = TIDCount;
 	ThreadsList[ThreadCount].PTID   = PTID;
 	ThreadsList[ThreadCount].TSTATE = READY;
-	ThreadsList[ThreadCount].TP     = ProcessList[PPID].PP;
+	ThreadsList[ThreadCount].TP     = ProcessList[]
+		
+		
+		].PP;
 	ThreadsList[ThreadCount].TCpuT  = 0;
 	ThreadsList[ThreadCount].TS     = 0;
 	ProcessList[PPID].TLast      = 0;
@@ -337,7 +340,7 @@ ThreadControlBlock* createThread(uint16_t PID, uint16_t PTID)
 	{
 		if (ProcessList[PPID].TIDs[TIDsCount] == nullptr)
 		{
-			ProcessList[PPID].TIDs = &ThreadsList[ThreadCount];
+			ProcessList[PPID].TIDs[TIDsCount] = &ThreadsList[ThreadCount];
 			return ThreadsList[ThreadCount];
 		}
 	}
