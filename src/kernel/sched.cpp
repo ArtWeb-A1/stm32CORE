@@ -279,12 +279,12 @@ ProcessControlBlock* createProcess(uint16_t PPID, uint8_t PPriority)
 	ProcessList[ProcessCount-1].PTZ = 0; 
 	ProcessList[ProcessCount-1].PS = 0; 
 
-	return ProcessList[PocessCount-1]; 
+	return &ProcessList[ProcessCount-1]; 
 }
 
 ThreadControlBlock* createThread(uint16_t PID, uint16_t PTID)
 {
-	if (TIDCount == MAX_TREADS_IN_LIST)
+	if (TIDCount == MAX_THREADS_IN_LIST)
 	{
 		return NULL;
 	}
@@ -315,9 +315,10 @@ ThreadControlBlock* createThread(uint16_t PID, uint16_t PTID)
 	{
 		if (ProcessList[PIDFound].PID == PID)
 		{
-			for (uint16_t )
-			PPID = 0;
+			PPID = PIDFound;
 			break;
+			// for (uint16_t )
+			// PPID = 0;
 		}
 		if (PIDFound < MAX_PROCESS_IN_LIST)
 		{
@@ -325,23 +326,21 @@ ThreadControlBlock* createThread(uint16_t PID, uint16_t PTID)
 		}
 	}
 
-	ThreadsList[ThreadCount].PID    = PID;
-	ThreadsList[ThreadCount].TID    = TIDCount;
-	ThreadsList[ThreadCount].PTID   = PTID;
-	ThreadsList[ThreadCount].TSTATE = READY;
-	ThreadsList[ThreadCount].TP     = ProcessList[]
-		
-		
-		].PP;
-	ThreadsList[ThreadCount].TCpuT  = 0;
-	ThreadsList[ThreadCount].TS     = 0;
-	ProcessList[PPID].TLast      = 0;
+	ThreadList[ThreadCount].PID    = PID;
+	ThreadList[ThreadCount].TID    = TIDCount;
+	ThreadList[ThreadCount].PTID   = PTID;
+	ThreadList[ThreadCount].TSTATE = READY;
+	ThreadList[ThreadCount].TP     = ProcessList[PPID].PP;
+	ThreadList[ThreadCount].TCpuT  = 0;
+	ThreadList[ThreadCount].TS     = 0;
+	ProcessList[PPID].TLast         = 0;
+	
 	for (uint8_t TIDsCount = 0; TIDsCount < MAX_TIDs_PER_PROCESS; TIDsCount++)
 	{
 		if (ProcessList[PPID].TIDs[TIDsCount] == nullptr)
 		{
-			ProcessList[PPID].TIDs[TIDsCount] = &ThreadsList[ThreadCount];
-			return ThreadsList[ThreadCount];
+			ProcessList[PPID].TIDs[TIDsCount] = &ThreadList[ThreadCount];
+			return &ThreadList[ThreadCount];
 		}
 	}
 	return NULL;

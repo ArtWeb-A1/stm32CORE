@@ -36,14 +36,12 @@
 
 // // ==================== [Another functions] ==================== //
 
-#include "main.h"
-#include "usbd_cdc_if.h"
-#include "usb_device.h"
+
 #include <cstring>
 
 int main()
 {
-    HAL_Init();
+    // HAL_Init();
 
     while (1)
     {

@@ -70,7 +70,7 @@ struct ProcessControlBlock // Структура определения проц
 }; 
 
 extern ProcessControlBlock ProcessList[MAX_PROCESS_IN_LIST];
-extern ThreadControlBlock ThreadList[MAX_THREADS_IN_LIST];
+extern ThreadControlBlock  ThreadList[MAX_THREADS_IN_LIST];
 extern MPURegionConfig     MPU_regions[MAX_MPU_REGIONS];
 
 extern uint8_t PIDFree[65536 / 8];
