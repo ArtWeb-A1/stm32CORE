@@ -310,20 +310,20 @@ ThreadControlBlock* createThread(ProcessControlBlock *Process, uint16_t PTID)
 	TIDFree[TIDCount / 8] |= (uint8_t)(1u << (TIDCount % 8)); 
 
 
-	ThreadList[ThreadCount].PID    = Process.PID;
+	ThreadList[ThreadCount].PID    = Process->PID;
 	ThreadList[ThreadCount].TID    = TIDCount;
 	ThreadList[ThreadCount].PTID   = PTID;
 	ThreadList[ThreadCount].TSTATE = READY;
-	ThreadList[ThreadCount].TP     = Process.PP;
+	ThreadList[ThreadCount].TP     = Process->PP;
 	ThreadList[ThreadCount].TCpuT  = 0;
 	ThreadList[ThreadCount].TS     = 0;
-	Process.TLast         = 0;
+	Process->TLast         = 0;
 	
 	for (uint8_t TIDsCount = 0; TIDsCount < MAX_TIDs_PER_PROCESS; TIDsCount++)
 	{
-		if (Process.TIDs[TIDsCount] == nullptr)
+		if (Process->TIDs[TIDsCount] == nullptr)
 		{
-			Process.TIDs[TIDsCount] = &ThreadList[ThreadCount];
+			Process->TIDs[TIDsCount] = &ThreadList[ThreadCount];
 			return &ThreadList[ThreadCount];
 		}
 	}
