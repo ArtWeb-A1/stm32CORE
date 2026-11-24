@@ -9,6 +9,25 @@
 #define MAX_MPU_REGIONS      12U
 #define MAX_PROCESS_IN_LIST  16U
 #define MAX_THREADS_IN_LIST  64U 
+#define PID_RESERVED_COUNT   50U   // PID 0..49 зарезервированы под системные процессы. createProcess их не выдаёт.
+
+enum class ThreadState : uint8_t   // Состояния потока.
+{
+	NEW        = 0x00,   // Создан, но ещё не готов к запуску.
+	READY      = 0x01,   // Готов к выполнению, ожидает CPU.
+	RUNNING    = 0x02,   // Выполняется на CPU.
+	BLOCKED    = 0x03,   // Ожидает события/ресурса.
+	TERMINATED = 0x04    // Завершён.
+};
+
+enum class ProcessState : uint8_t  // Состояния процесса.
+{
+	NEW        = 0x00,
+	READY      = 0x01,
+	RUNNING    = 0x02,
+	BLOCKED    = 0x03,
+	TERMINATED = 0x04
+};
 
 struct MPURegionConfig     // Структура определения региона.
 {
@@ -41,7 +60,7 @@ struct ThreadControlBlock  // Структура определения пото
 	uint16_t PID;    // Process Id       	    - Номер процесса.
 	uint16_t TID;    // Thread Id               - Номер потока процесса.
 	uint16_t PTID;   // Parent Thread Id  	    - Номер родительского потока процесса.
-	uint8_t TSTATE;  // Thread State      	    - Состояние потока процесса.
+	ThreadState TSTATE;  // Thread State      	    - Состояние потока процесса.
 	uint8_t TP;      // Thread Priority  	    - Приоретет потока процесса.
 	uint64_t TCpuT;  // Thread Cpu Time         - Рабочее время потока процесса на CPU. (Сохраняет время в микросекундах).
 	uintptr_t  TSP;  // Process Stack Pointer   - Адрес стека у потока.
@@ -49,13 +68,15 @@ struct ThreadControlBlock  // Структура определения пото
 	uint32_t TPC;    // Thread Program Counter   - Значение следующий инструкции процесса.
 	RegisterContext TR;// Thread Registers       - Сохранение состояния регистров процессора для данного процесса.
 	int16_t TS;     // Thread Signal            - Передача сигнала в процесс.
+	uint64_t TStart; // Thread Start Time       - Метка времени (мкс) начала текущего интервала работы потока на CPU. Нужна для расчёта TCpuT.
+						 // ВАЖНО: новые поля добавлять только в конец структуры: PendSV_Handler обращается к TSP и TR по жёстким смещениям.
 };
 
 struct ProcessControlBlock // Структура определения процесса.
 {
 	uint16_t PID;    // Process Id       	    - Номер процесса.
 	uint16_t PPID;   // Parent Process Id	    - Номер родительского процесса.
-	uint8_t PSTATE;  // Process State     	    - Состояние процесса.
+	ProcessState PSTATE;  // Process State     	    - Состояние процесса.
 	uint8_t PP;      // Process Priority  	    - Приоретет процесса. Приоретет работает следующем оброзом:
 					 // 						  255 - наименьший приоритет. 0 - наивысший приоритет.
 	uint64_t PCpuT;  // Process Cpu Time        - Рабочее время процесса на CPU. (Сохраняет время в микросекундах).
@@ -76,6 +97,7 @@ extern MPURegionConfig     MPU_regions[MAX_MPU_REGIONS];
 extern uint8_t PIDFree[65536 / 8];
 
 ThreadControlBlock *scheduler(void);
-ProcessControlBlock* createProcess(void);
+ProcessControlBlock* createProcess(uint16_t PPID, uint8_t PPriority);
+ThreadControlBlock*  createThread(ProcessControlBlock *Process, uint16_t PTID);
 
-#endif 
+#endif

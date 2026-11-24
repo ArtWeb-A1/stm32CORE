@@ -1,28 +1,24 @@
 #include "sched.h"
 
-#define NEW                 0x00
-#define READY               0x01		// В будующем вынести в отдельный файл с глобальными перемеными. 
-#define RUNNING             0x02
-
-uint16_t ProcessCount   = 0;
-uint16_t PIDCount       = 1;
+static uint16_t ProcessCount   = 0;
+static uint16_t PIDCount       = PID_RESERVED_COUNT - 1U;
 uint8_t PIDFree[65536 / 8] = {0};		// 0 - PID свободен. 1 - PID занят.
 
-uint16_t ThreadCount = 0;
-uint16_t TIDCount    = 0;
-uint8_t TIDFree[65536 / 8] = {0};
+static uint16_t ThreadCount = 0;
+static uint16_t TIDCount    = 0;
+static uint8_t TIDFree[65536 / 8] = {0};
 
-uint16_t ProcessLast    = 65535;
-uint16_t ThreadLast     = 65535;
+static uint16_t ProcessLast    = 65535;
+static uint16_t ThreadLast     = 65535;
 
-volatile uint8_t switch_pending = 0;
-volatile uint8_t quantum_left   = 0;
+volatile uint8_t switch_pending = 0;     // ВНИМАНИЕ: не static! К этим трём переменным PendSV_Handler обращается из asm по имени символа.
+static volatile uint8_t quantum_left   = 0;
 
 MPURegionConfig     MPU_regions[MAX_MPU_REGIONS]     {};        // Массив с текущими регионами (включая выключенных).
 ProcessControlBlock ProcessList[MAX_PROCESS_IN_LIST] {};        // Массив со всеми текущими процессами.
 ThreadControlBlock  ThreadList[MAX_THREADS_IN_LIST]  {};        // Массив со всеми текущими потоками.
 
-ThreadControlBlock* last_thread    = nullptr;
+ThreadControlBlock* last_thread    = nullptr;   // (в C++ static-переменная получает декорированное имя, и asm её не найдёт: undefined reference при линковке)
 ThreadControlBlock* current_thread = nullptr;
 
 static_assert(offsetof(ThreadControlBlock, TSP) % 4 == 0,
@@ -37,6 +33,48 @@ static_assert(offsetof(ThreadControlBlock, TR) % 4 == 0,
 // Программа А имеет 3 потока.
 // Программа Б имеет 1 поток.
 // А1 -> Б1 -> А2 -> Б1 -> А3
+
+// ==================== [Системное время] ==================== //
+
+#define TICK_PERIOD_US      1000U       // Период SysTick в мкс (1 мс).
+
+static uint64_t sys_time_us = 0;        // Время в мкс по целым тикам SysTick. Меняется только в SysTick_Handler.
+
+// Текущее время в мкс: целые тики + доля текущего тика по счётчику SysTick->VAL (он считает вниз от LOAD до 0).
+// Вызывать только из прерываний с приоритетом не выше SysTick (например, из scheduler()),
+// иначе sys_time_us может измениться между чтениями.
+static uint64_t getTimeUs(void)
+{
+	const uint32_t load    = SysTick->LOAD;
+	uint32_t       val     = SysTick->VAL;
+	if (val > load) val = load;
+	const uint32_t elapsed = load - val;                                   // Тактов с начала текущего тика.
+	const uint32_t sub_us  = (uint32_t)(((uint64_t)elapsed * TICK_PERIOD_US) / ((uint64_t)load + 1U));
+	return sys_time_us + sub_us;
+}
+
+static ProcessControlBlock* findProcess(uint16_t PID)
+{
+	for (uint16_t i = 0; i < ProcessCount; i++)
+	{
+		if (ProcessList[i].PID == PID) return &ProcessList[i];
+	}
+	return nullptr;
+}
+
+// Закрывает интервал работы потока [TStart, now]: добавляет его длительность к времени потока и его процесса,
+// после чего открывает новый интервал с now (если поток продолжит работать, время не потеряется).
+static void accountRunTime(ThreadControlBlock *Thread, uint64_t now)
+{
+	if (Thread == nullptr) return;
+
+	const uint64_t delta = (now > Thread->TStart) ? (now - Thread->TStart) : 0;
+	Thread->TCpuT += delta;
+	Thread->TStart = now;
+
+	ProcessControlBlock *Process = findProcess(Thread->PID);
+	if (Process != nullptr) Process->PCpuT += delta;
+}
 
 extern "C" __attribute__((naked))
 void PendSV_Handler(void)
@@ -90,9 +128,9 @@ void PendSV_Handler(void)
 extern "C" void SysTick_Handler(void)
 {
     HAL_IncTick();
+    sys_time_us += TICK_PERIOD_US;
     if (current_thread) {
-        current_thread->TCpuT += 1000;                    // 1 мс в мкс
-        if (current_thread->TSTATE != READY) quantum_left = 0;
+        if (current_thread->TSTATE != ThreadState::RUNNING) quantum_left = 0;
     }
     if (quantum_left) quantum_left--;
     if (quantum_left == 0) scheduler();
@@ -176,7 +214,10 @@ extern "C" void SysTick_Handler(void)
 ThreadControlBlock *scheduler(void) 
 {
 	if (switch_pending) return NULL;
-	if (current_thread && current_thread->TSTATE == RUNNING) current_thread->TSTATE = READY;
+
+	const uint64_t now = getTimeUs();
+	accountRunTime(current_thread, now);                            // Закрыть интервал работы потока, который работал до этого момента.
+	if (current_thread && current_thread->TSTATE == ThreadState::RUNNING) current_thread->TSTATE = ThreadState::READY;
 	
 	bool ThreadIsReady = false;
 
@@ -190,7 +231,7 @@ ThreadControlBlock *scheduler(void)
 	{
 		uint16_t pNum = (ProcessLast + pCount) % ProcessCount;		// Подсчет следующего процесса.
 		// ProcessLast = pNum;
-		if (ProcessList[pNum].PSTATE == READY)                      // Проверка процесса на готовность.
+		if (ProcessList[pNum].PSTATE == ProcessState::READY)                      // Проверка процесса на готовность.
 		{
 			// Анализ статуса потока и запуск его выполнения.
 			for (uint16_t tCount=1; tCount<=MAX_TIDs_PER_PROCESS; tCount++) // Перебор всех потоков процесса.
@@ -199,7 +240,7 @@ ThreadControlBlock *scheduler(void)
 				
 				if (ProcessList[pNum].TIDs[tNum] != NULL)               // Проверка существования потока.
 				{
-					if (ProcessList[pNum].TIDs[tNum]->TSTATE == READY)  // Проверка потока на готовность.
+					if (ProcessList[pNum].TIDs[tNum]->TSTATE == ThreadState::READY)  // Проверка потока на готовность.
 					{
 						if (ProcessLast != 65535 && ThreadLast != 65535)
 						{
@@ -207,9 +248,10 @@ ThreadControlBlock *scheduler(void)
 						}
 						
 						current_thread = ProcessList[pNum].TIDs[tNum];
+						current_thread->TStart = now;                   // Начало интервала работы выбранного потока.
 
 						quantum_left = 1;
-						current_thread->TSTATE = RUNNING;
+						current_thread->TSTATE = ThreadState::RUNNING;
 						
 						if (last_thread != current_thread)
 						{	
@@ -237,35 +279,43 @@ ThreadControlBlock *scheduler(void)
 	return NULL;
 }
 	
+#define TID_FIRST           1U          // TID 0 не выдаётся.
+
+// Поиск свободного ID в битмапе (0 - свободен, 1 - занят) по кругу в диапазоне [first, 65535],
+// начиная со следующего за last. Возвращает найденный ID или -1, если свободных ID нет.
+// Подсказка по работе с битами:
+// bitmap[index / 8] |= (uint8_t)(1u << (index % 8));   // Записать 1
+// bitmap[index / 8] &= (uint8_t)~(1u << (index % 8));  // Записать 0
+// uint8_t value = (bitmap[index / 8] >> (index % 8)) & 1u; // Прочитать бит
+static int32_t allocID(const uint8_t *bitmap, uint16_t last, uint16_t first)
+{
+	const uint32_t range  = 65536U - first;                                        // Сколько ID в диапазоне.
+	const uint32_t offset = (last >= first) ? (uint32_t)(last - first + 1U) : 0U;  // Смещение, с которого начинаем поиск.
+
+	for (uint32_t i = 0; i < range; i++)
+	{
+		const uint32_t id = first + ((offset + i) % range);
+		if (((bitmap[id / 8U] >> (id % 8U)) & 1U) == 0U)
+		{
+			return (int32_t)id;
+		}
+	}
+	return -1;
+}
+
 ProcessControlBlock* createProcess(uint16_t PPID, uint8_t PPriority)
 {
 	if (ProcessCount >= MAX_PROCESS_IN_LIST)
 	{
 		return NULL;
 	}
-	if (PIDCount == 65535)
+	// PID 0..PID_RESERVED_COUNT-1 зарезервированы под системные процессы, обычным процессам не выдаются.
+	int32_t newPID = allocID(PIDFree, PIDCount, PID_RESERVED_COUNT);
+	if (newPID < 0)
 	{
-		PIDCount = 1;
+		return NULL;
 	}
-	for (uint16_t pcPID = PIDCount+1; pcPID <= 65535; pcPID++)  // PIDCount это последний созданый PID соответственно PIDCount+1 это PID создоваемого процесса.
-	{
-		if (pcPID == PIDCount)
-		{
-			return NULL;
-		}
-		if (((PIDFree[pcPID / 8] >> (pcPID % 8)) & 1u) == 0)
-		{
-			PIDCount = pcPID;
-			break;
-		} 
-		if (pcPID == 65535)
-		{
-			pcPID = 0;
-		} 
-			// bitmap[index / 8] |= (uint8_t)(1u << (index % 8)); // Записать 1
-			// bitmap[index / 8] &= (uint8_t)~(1u << (index % 8)); // Записать 0
-			// uint8_t value = (bitmap[index / 8] >> (index % 8)) & 1u; // Прочитать бит
-	}
+	PIDCount = (uint16_t)newPID;
 
 	ProcessCount++; 
 
@@ -273,7 +323,7 @@ ProcessControlBlock* createProcess(uint16_t PPID, uint8_t PPriority)
 
 	ProcessList[ProcessCount-1].PID = PIDCount; 
 	ProcessList[ProcessCount-1].PPID = PPID; 
-	ProcessList[ProcessCount-1].PSTATE = READY;
+	ProcessList[ProcessCount-1].PSTATE = ProcessState::READY;
 	ProcessList[ProcessCount-1].PP = PPriority; 
 	ProcessList[ProcessCount-1].PCpuT = 0; 
 	ProcessList[ProcessCount-1].PTZ = 0; 
@@ -284,48 +334,54 @@ ProcessControlBlock* createProcess(uint16_t PPID, uint8_t PPriority)
 
 ThreadControlBlock* createThread(ProcessControlBlock *Process, uint16_t PTID)
 {
-	if (TIDCount == MAX_THREADS_IN_LIST)
+	if (Process == nullptr)
 	{
 		return NULL;
 	}
-	if (TIDCount == 65535)
+	if (ThreadCount >= MAX_THREADS_IN_LIST)
 	{
-		TIDCount = 0;
+		return NULL;
 	}
-	for (uint16_t pcTID = TIDCount+1; pcTID <= 65535; pcTID++)
-	{
-		if (pcTID == TIDCount)
-		{
-			return NULL;
-		}
-		if (((TIDFree[pcTID / 8] >> (pcTID % 8)) & 1u) == 0)
-		{
-			TIDCount = pcTID;
-			break;
-		}
-	}
-	
-	ThreadCount++;
 
-	TIDFree[TIDCount / 8] |= (uint8_t)(1u << (TIDCount % 8)); 
-
-
-	ThreadList[ThreadCount].PID    = Process->PID;
-	ThreadList[ThreadCount].TID    = TIDCount;
-	ThreadList[ThreadCount].PTID   = PTID;
-	ThreadList[ThreadCount].TSTATE = READY;
-	ThreadList[ThreadCount].TP     = Process->PP;
-	ThreadList[ThreadCount].TCpuT  = 0;
-	ThreadList[ThreadCount].TS     = 0;
-	Process->TLast         = 0;
-	
+	// Место в таблице потоков процесса ищем ДО выделения TID и слота в ThreadList:
+	// при отказе ничего не должно остаться занятым.
+	uint8_t freeSlot = MAX_TIDs_PER_PROCESS;
 	for (uint8_t TIDsCount = 0; TIDsCount < MAX_TIDs_PER_PROCESS; TIDsCount++)
 	{
 		if (Process->TIDs[TIDsCount] == nullptr)
 		{
-			Process->TIDs[TIDsCount] = &ThreadList[ThreadCount];
-			return &ThreadList[ThreadCount];
+			freeSlot = TIDsCount;
+			break;
 		}
 	}
-	return NULL;
+	if (freeSlot == MAX_TIDs_PER_PROCESS)
+	{
+		return NULL;
+	}
+
+	int32_t newTID = allocID(TIDFree, TIDCount, TID_FIRST);
+	if (newTID < 0)
+	{
+		return NULL;
+	}
+	TIDCount = (uint16_t)newTID;
+
+	ThreadCount++;
+
+	TIDFree[TIDCount / 8] |= (uint8_t)(1u << (TIDCount % 8));
+
+	ThreadControlBlock *Thread = &ThreadList[ThreadCount-1];
+
+	Thread->PID    = Process->PID;
+	Thread->TID    = TIDCount;
+	Thread->PTID   = PTID;
+	Thread->TSTATE = ThreadState::READY;
+	Thread->TP     = Process->PP;
+	Thread->TCpuT  = 0;
+	Thread->TStart = 0;
+	Thread->TS     = 0;
+	Process->TLast = 0;
+
+	Process->TIDs[freeSlot] = Thread;     // Поток подключаем к процессу последним, когда он уже полностью заполнен.
+	return Thread;
 }

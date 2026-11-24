@@ -38,9 +38,14 @@
 
 
 #include <cstring>
+#include "stm32h5xx.h"
 
 int main()
 {
+    // PendSV - самый низкий приоритет: переключение контекста не должно прерывать
+    // другие обработчики прерываний (и не должно быть прервано ими посреди смены PSP).
+    NVIC_SetPriority(PendSV_IRQn, (1UL << __NVIC_PRIO_BITS) - 1UL);
+
     // HAL_Init();
 
     while (1)
